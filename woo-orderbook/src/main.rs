@@ -1,20 +1,23 @@
 use std::time::Instant;
 
-use serde_json::Value;
+use std::io::{Error, ErrorKind};
+
+use serde_json::{Number, Value};
 use tungstenite::{ClientRequestBuilder, connect, http::Uri, protocol::Message};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Order {
     price: String,
     quantity: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct OrderBook {
     timestamp: u64,
     symbol: String,
     max_order_size: u64,
-    orders: Vec<Order>,
+    asks: Vec<Order>,
+    bids: Vec<Order>,
 }
 
 impl OrderBook {
@@ -23,22 +26,86 @@ impl OrderBook {
             timestamp: 0,
             symbol: symbol.to_string(),
             max_order_size,
-            orders: Vec::new(),
+            asks: Vec::new(),
+            bids: Vec::new(),
         }
     }
 
-    fn init_snapshot(&self, snapshot_cmd: &str) -> Result<(), String> {
-        println!("{snapshot_cmd}");
+    fn init_snapshot(&mut self, snapshot_cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // optionally assert snapshot is asking for same symbol and max_size.
+        let body = reqwest::blocking::get(snapshot_cmd)?.text()?;
+        let parsed_body: Value = serde_json::from_str(body.as_str())?;
+
+        if parsed_body["success"].as_bool() != Some(true) {
+            return Err("request was not successful".into());
+        }
+
+        self.timestamp = parsed_body["timestamp"].as_u64().ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidData,
+                "snapshot timestamp is missing or is not a u64",
+            )
+        })?;
+
+        self.asks = Vec::new();
+        self.bids = Vec::new();
+
+        for parsed_ask in parsed_body["data"]["asks"].as_array().ok_or_else(|| {
+            Error::new(ErrorKind::InvalidData, "asks is missing or is not an array")
+        })? {
+            let order = Order {
+                price: String::from(parsed_ask["price"].as_str().ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidData,
+                        "ask is missing price or is not a string",
+                    )
+                })?),
+
+                quantity: String::from(parsed_ask["quantity"].as_str().ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidData,
+                        "ask is missing quantity or is not a string",
+                    )
+                })?),
+            };
+
+            self.asks.push(order);
+        }
+
+        for parsed_bid in parsed_body["data"]["bids"].as_array().ok_or_else(|| {
+            Error::new(ErrorKind::InvalidData, "bids is missing or is not an array")
+        })? {
+            let order = Order {
+                price: String::from(parsed_bid["price"].as_str().ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidData,
+                        "bid is missing price or is not a string",
+                    )
+                })?),
+
+                quantity: String::from(parsed_bid["quantity"].as_str().ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidData,
+                        "bid is missing quantity or is not a string",
+                    )
+                })?),
+            };
+
+            self.bids.push(order);
+        }
+
         Ok(())
     }
 }
 
 fn main() {
-    let order_book = OrderBook::new("PERP_ETH_USDT", 5);
+    let mut order_book = OrderBook::new("PERP_ETH_USDT", 5);
     let snapshot_cmd =
         "https://api.woo.org/v3/public/orderbook?symbol=PERP_ETH_USDT&maxLevel=5&rpi=true";
     order_book.init_snapshot(snapshot_cmd).unwrap();
-    println!("{order_book:#?}");
+
+    println!("order_book = {order_book:?}");
+
     // let uri: Uri = "wss://wss.woox.io/v3/public".parse().unwrap();
     // let builder = ClientRequestBuilder::new(uri);
     // let mut started = std::time::Instant::now();

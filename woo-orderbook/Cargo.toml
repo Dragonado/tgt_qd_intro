@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 tungstenite = { version = "0.30.0", features = ["native-tls"] }
 serde_json = "1"
+reqwest = { version = "0.13.4", features = ["blocking", "json"] }
