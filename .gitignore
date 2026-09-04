@@ -3,3 +3,6 @@ progress.md
 
 # Cargo build artifacts
 target/
+
+# Local editor settings
+.vscode/

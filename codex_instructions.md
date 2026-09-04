@@ -249,3 +249,5 @@ Keep it updated whenever meaningful work occurs, including:
 * unresolved questions or blockers
 
 Update it as part of the same task rather than relying on the user to request an update. Keep it concise and factual. Do not mark a topic or milestone complete unless it was actually completed, and do not replace useful existing history without a good reason.
+
+When determining the user's current progress, also inspect the Git history and working-tree status. Use commit messages and diffs as evidence of work completed or currently underway, especially when `progress.md` is incomplete or stale. Do not assume that a commit proves the user understands every concept involved, and do not overwrite uncommitted work while inspecting or updating progress.
