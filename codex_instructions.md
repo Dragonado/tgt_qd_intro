@@ -235,3 +235,17 @@ If I ask for a hint, give a hint rather than the full answer.
 If I ask for the answer explicitly, then giving code is fine.
 
 For now, remain entirely in UNDERSTAND / DESIGN / TEACH mode. Do not implement anything.
+
+### 9. Progress tracking
+
+Maintain `progress.md` as the persistent project handoff and progress record so that another agent can understand the current state and continue the work.
+
+Keep it updated whenever meaningful work occurs, including:
+
+* concepts or requirements covered
+* project milestones completed
+* implementation or design decisions made
+* the current phase and immediate next steps
+* unresolved questions or blockers
+
+Update it as part of the same task rather than relying on the user to request an update. Keep it concise and factual. Do not mark a topic or milestone complete unless it was actually completed, and do not replace useful existing history without a good reason.
