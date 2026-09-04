@@ -6,7 +6,7 @@ use serde_json::{Number, Value};
 use tungstenite::{ClientRequestBuilder, connect, http::Uri, protocol::Message};
 
 #[derive(Debug, Default)]
-struct Order {
+struct PriveLevel {
     price: String,
     quantity: String,
 }
@@ -15,26 +15,71 @@ struct Order {
 struct OrderBook {
     timestamp: u64,
     symbol: String,
-    max_order_size: u64,
-    asks: Vec<Order>,
-    bids: Vec<Order>,
+    max_levels: u64,
+    asks: Vec<PriveLevel>,
+    bids: Vec<PriveLevel>,
 }
 
 impl OrderBook {
-    fn new(symbol: &str, max_order_size: u64) -> Self {
+    fn new(symbol: &str, max_levels: u64) -> Self {
         Self {
             timestamp: 0,
             symbol: symbol.to_string(),
-            max_order_size,
+            max_levels,
             asks: Vec::new(),
             bids: Vec::new(),
         }
     }
 
-    fn init_snapshot(&mut self, snapshot_cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
-        // optionally assert snapshot is asking for same symbol and max_size.
-        let body = reqwest::blocking::get(snapshot_cmd)?.text()?;
-        let parsed_body: Value = serde_json::from_str(body.as_str())?;
+    fn snapshot_url(&self) -> Result<reqwest::Url, Box<dyn std::error::Error>> {
+        let mut url = reqwest::Url::parse("https://api.woox.io/v3/public/orderbook")?;
+
+        url.query_pairs_mut()
+            .append_pair("symbol", &self.symbol)
+            .append_pair("maxLevel", &self.max_levels.to_string())
+            .append_pair("rpi", "true");
+
+        Ok(url)
+    }
+
+    fn parse_order(
+        side_key: &str,
+        data: &Value,
+    ) -> Result<Vec<PriveLevel>, Box<dyn std::error::Error>> {
+        let mut price_levels = Vec::new();
+        for parsed_price_level in data[side_key].as_array().ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!("{side_key} is missing or is not an array"),
+            )
+        })? {
+            let price_level = PriveLevel {
+                price: String::from(parsed_price_level["price"].as_str().ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidData,
+                        format!("{side_key} is missing price or is not a string"),
+                    )
+                })?),
+
+                quantity: String::from(parsed_price_level["quantity"].as_str().ok_or_else(
+                    || {
+                        Error::new(
+                            ErrorKind::InvalidData,
+                            format!("{side_key} is missing quantity or is not a string"),
+                        )
+                    },
+                )?),
+            };
+
+            price_levels.push(price_level);
+        }
+        Ok(price_levels)
+    }
+
+    fn init_from_snapshot(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let url = self.snapshot_url()?;
+        let response = reqwest::blocking::get(url)?.error_for_status()?.text()?;
+        let parsed_body: Value = serde_json::from_str(response.as_str())?;
 
         if parsed_body["success"].as_bool() != Some(true) {
             return Err("request was not successful".into());
@@ -47,52 +92,8 @@ impl OrderBook {
             )
         })?;
 
-        self.asks = Vec::new();
-        self.bids = Vec::new();
-
-        for parsed_ask in parsed_body["data"]["asks"].as_array().ok_or_else(|| {
-            Error::new(ErrorKind::InvalidData, "asks is missing or is not an array")
-        })? {
-            let order = Order {
-                price: String::from(parsed_ask["price"].as_str().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidData,
-                        "ask is missing price or is not a string",
-                    )
-                })?),
-
-                quantity: String::from(parsed_ask["quantity"].as_str().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidData,
-                        "ask is missing quantity or is not a string",
-                    )
-                })?),
-            };
-
-            self.asks.push(order);
-        }
-
-        for parsed_bid in parsed_body["data"]["bids"].as_array().ok_or_else(|| {
-            Error::new(ErrorKind::InvalidData, "bids is missing or is not an array")
-        })? {
-            let order = Order {
-                price: String::from(parsed_bid["price"].as_str().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidData,
-                        "bid is missing price or is not a string",
-                    )
-                })?),
-
-                quantity: String::from(parsed_bid["quantity"].as_str().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidData,
-                        "bid is missing quantity or is not a string",
-                    )
-                })?),
-            };
-
-            self.bids.push(order);
-        }
+        self.asks = Self::parse_order("asks", &parsed_body["data"])?;
+        self.bids = Self::parse_order("bids", &parsed_body["data"])?;
 
         Ok(())
     }
@@ -100,9 +101,7 @@ impl OrderBook {
 
 fn main() {
     let mut order_book = OrderBook::new("PERP_ETH_USDT", 5);
-    let snapshot_cmd =
-        "https://api.woo.org/v3/public/orderbook?symbol=PERP_ETH_USDT&maxLevel=5&rpi=true";
-    order_book.init_snapshot(snapshot_cmd).unwrap();
+    order_book.init_from_snapshot().unwrap();
 
     println!("order_book = {order_book:?}");
 
