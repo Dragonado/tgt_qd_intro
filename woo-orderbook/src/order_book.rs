@@ -1,10 +1,11 @@
 use std::io::{self, Write};
-use std::io::{Error, ErrorKind};
+
+use rust_decimal::Decimal;
 
 #[derive(Debug, Default)]
 pub(crate) struct PriceLevel {
-    pub(crate) price: String,
-    pub(crate) quantity: String,
+    pub(crate) price: Decimal,
+    pub(crate) quantity: Decimal,
 }
 
 #[derive(Debug, Default)]
@@ -31,10 +32,10 @@ pub(crate) struct OrderBook {
 }
 
 impl OrderBook {
-    pub(crate) fn new(symbol: &str, max_levels: usize) -> Self {
+    pub(crate) fn new(symbol: String, max_levels: usize) -> Self {
         Self {
             timestamp: 0,
-            symbol: symbol.to_string(),
+            symbol,
             max_levels,
             asks: Vec::new(),
             bids: Vec::new(),
@@ -42,21 +43,55 @@ impl OrderBook {
     }
 
     pub(crate) fn from_snapshot(
-        symbol: &str,
+        symbol: String,
         max_levels: usize,
         timestamp: u64,
-        asks: Vec<PriceLevel>,
-        bids: Vec<PriceLevel>,
+        mut asks: Vec<PriceLevel>,
+        mut bids: Vec<PriceLevel>,
     ) -> Self {
-        // asks.sort();
-        // bids.sort();
+        Self::filter_and_sort(&mut asks, max_levels, false);
+        Self::filter_and_sort(&mut bids, max_levels, true);
+
         Self {
             timestamp,
-            symbol: symbol.to_string(),
+            symbol,
             max_levels,
             asks,
             bids,
         }
+    }
+
+    fn filter_and_sort(price_levels: &mut Vec<PriceLevel>, max_levels: usize, descending: bool) {
+        price_levels.retain(|level| level.quantity != Decimal::ZERO);
+
+        if descending {
+            price_levels.sort_by(|left, right| right.price.cmp(&left.price));
+        } else {
+            price_levels.sort_by(|left, right| left.price.cmp(&right.price));
+        }
+
+        while price_levels.len() > max_levels {
+            price_levels.pop();
+        }
+    }
+    fn upsert_filter_and_sort(
+        price_levels: &mut Vec<PriceLevel>,
+        updates: Vec<PriceLevel>,
+        max_levels: usize,
+        descending: bool,
+    ) {
+        for update in updates {
+            if let Some(index) = price_levels
+                .iter()
+                .position(|level| level.price == update.price)
+            {
+                price_levels[index].quantity = update.quantity;
+            } else {
+                price_levels.push(update);
+            }
+        }
+
+        Self::filter_and_sort(price_levels, max_levels, descending);
     }
 
     // If order_book.previous_timestamp == order_book.timestamp then we incrementally update the order book.
@@ -66,12 +101,19 @@ impl OrderBook {
         &mut self,
         update: OrderBookUpdate,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // // Validate and apply update.
-        // self.asks = update.asks;
-        // self.bids = update.bids;
-        // self.timestamp = update.timestamp;
+        if update.symbol != self.symbol {
+            return Err("Wrong symbol update".into());
+        }
+        if update.previous_timestamp != self.timestamp {
+            return Err("Timestamp mismatch error".into());
+        }
 
-        Err("Not taking updates rn".into())
+        self.timestamp = update.timestamp;
+
+        Self::upsert_filter_and_sort(&mut self.asks, update.asks, self.max_levels, false);
+        Self::upsert_filter_and_sort(&mut self.bids, update.bids, self.max_levels, true);
+
+        Ok(())
     }
 
     pub(crate) fn print_state(&self) {
@@ -83,21 +125,25 @@ impl OrderBook {
         );
         println!("{}", "-".repeat(72));
 
-        for (index, (bid, ask)) in self
-            .bids
-            .iter()
-            .rev()
-            .take(self.max_levels)
-            .zip(self.asks.iter().take(self.max_levels))
-            .enumerate()
-        {
+        for index in 0..5 {
+            let (bid_quantity, bid_price) = self
+                .bids
+                .get(index)
+                .map(|bid| (bid.quantity.to_string(), bid.price.to_string()))
+                .unwrap_or_else(|| ("-".to_string(), "-".to_string()));
+            let (ask_price, ask_quantity) = self
+                .asks
+                .get(index)
+                .map(|ask| (ask.price.to_string(), ask.quantity.to_string()))
+                .unwrap_or_else(|| ("-".to_string(), "-".to_string()));
+
             println!(
                 "{:>4} | {:>14} | {:>14} | {:>14} | {:>14}",
                 index + 1,
-                bid.quantity,
-                bid.price,
-                ask.price,
-                ask.quantity
+                bid_quantity,
+                bid_price,
+                ask_price,
+                ask_quantity
             );
         }
         io::stdout().flush().unwrap();

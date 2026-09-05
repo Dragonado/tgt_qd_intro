@@ -1,8 +1,10 @@
-use crate::order_book::{self, OrderBook, OrderBookUpdate, PriceLevel};
+use crate::order_book::{OrderBook, OrderBookUpdate, PriceLevel};
 use serde_json::{Map, Value};
 use std::io::{Error, ErrorKind};
 use std::net::TcpStream;
 use tungstenite::{ClientRequestBuilder, WebSocket, connect, http::Uri, protocol::Message, stream};
+
+use rust_decimal::Decimal;
 
 pub(crate) struct WooListener {
     socket: WebSocket<stream::MaybeTlsStream<TcpStream>>,
@@ -41,7 +43,7 @@ impl WooListener {
         }
     }
 
-    fn parse_price_levels(
+    fn parse_price_levels_from_update(
         side_key: &str,
         data: &Map<String, Value>,
     ) -> Result<Vec<PriceLevel>, Box<dyn std::error::Error>> {
@@ -52,26 +54,18 @@ impl WooListener {
                 format!("{side_key} is missing or is not an array"),
             )
         })? {
-            let parsed_price_level_arr = parsed_price_level.as_array().ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidData,
-                    format!("{side_key} is not an array of [price, quantity]"),
-                )
-            })?;
-
             let price_level = PriceLevel {
-                price: String::from(parsed_price_level[0].as_str().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidData,
-                        format!("{side_key} is missing price"),
-                    )
-                })?),
-                quantity: String::from(parsed_price_level_arr[1].as_str().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidData,
-                        format!("{side_key} is missing quantity"),
-                    )
-                })?),
+                price: parsed_price_level
+                    .get(0)
+                    .and_then(Value::as_str)
+                    .ok_or("price is missing or is not a string")?
+                    .parse::<Decimal>()?,
+
+                quantity: parsed_price_level
+                    .get(1)
+                    .and_then(Value::as_str)
+                    .ok_or("quantity is missing or is not a string")?
+                    .parse::<Decimal>()?,
             };
 
             price_levels.push(price_level);
@@ -91,20 +85,14 @@ impl WooListener {
             )
         })? {
             let price_level = PriceLevel {
-                price: String::from(parsed_price_level["price"].as_str().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidData,
-                        format!("{side_key} is missing price"),
-                    )
-                })?),
-                quantity: String::from(parsed_price_level["quantity"].as_str().ok_or_else(
-                    || {
-                        Error::new(
-                            ErrorKind::InvalidData,
-                            format!("{side_key} is missing quantity"),
-                        )
-                    },
-                )?),
+                price: parsed_price_level["price"]
+                    .as_str()
+                    .ok_or("price is missing or is not a string")?
+                    .parse::<Decimal>()?,
+                quantity: parsed_price_level["quantity"]
+                    .as_str()
+                    .ok_or("quantity is missing or is not a string")?
+                    .parse::<Decimal>()?,
             };
 
             price_levels.push(price_level);
@@ -120,8 +108,8 @@ impl WooListener {
         let mut url = reqwest::Url::parse("https://api.woox.io/v3/public/orderbook")?;
 
         url.query_pairs_mut()
-            .append_pair("symbol", &symbol)
-            .append_pair("maxLevel", &max_levels.to_string())
+            .append_pair("symbol", symbol)
+            .append_pair("maxLevel", "50")
             .append_pair("rpi", "true");
 
         let response = reqwest::blocking::get(url)?.error_for_status()?.text()?;
@@ -132,7 +120,7 @@ impl WooListener {
         }
 
         Ok(OrderBook::from_snapshot(
-            symbol,
+            symbol.to_string(),
             max_levels,
             parsed_body["timestamp"].as_u64().ok_or_else(|| {
                 Error::new(
@@ -184,8 +172,8 @@ impl WooListener {
                     timestamp: data_json["ts"].as_u64().ok_or_else(|| {
                         Error::new(ErrorKind::InvalidData, "update is missing integer ts")
                     })?,
-                    asks: Self::parse_price_levels("asks", data_json)?,
-                    bids: Self::parse_price_levels("bids", data_json)?,
+                    asks: Self::parse_price_levels_from_update("asks", data_json)?,
+                    bids: Self::parse_price_levels_from_update("bids", data_json)?,
                 })
             }
             _ => Err("Update unsuccessful.".into()),

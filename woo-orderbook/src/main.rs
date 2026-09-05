@@ -30,7 +30,7 @@ impl Drop for TerminalGuard {
 fn main() {
     let _terminal_guard = TerminalGuard::enter();
 
-    let mut order_book = OrderBook::new("PERP_ETH_USDT", 5);
+    let mut order_book = OrderBook::new("PERP_ETH_USDT".to_string(), 50);
 
     let mut listener = WooListener::connect().unwrap();
 
@@ -40,22 +40,23 @@ fn main() {
 
     order_book.print_state();
 
-    let mut started = std::time::Instant::now();
+    let mut started;
     loop {
         started = Instant::now();
         let update = listener.wait_and_get_update().unwrap();
-        let res = order_book.ingest_incremental_update(update);
-
-        match res {
-            Err(_) => {
-                order_book = WooListener::wait_and_get_snapshot("PERP_ETH_USDT", 5).unwrap();
-                println!("FRESH SNAPSHOT");
+        let status;
+        match order_book.ingest_incremental_update(update) {
+            Err(error) => {
+                order_book = WooListener::wait_and_get_snapshot("PERP_ETH_USDT", 50).unwrap();
+                status = format!("FRESH SNAPSHOT: {error}");
             }
-            _ => {
-                println!("UPDATED");
+            Ok(()) => {
+                status = String::from("UPDATED");
             }
         }
         order_book.print_state();
+        println!();
+        println!("Status: {status}");
         println!("Incremental update RTT: {:?}", started.elapsed());
     }
 }
