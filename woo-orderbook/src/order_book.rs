@@ -1,6 +1,11 @@
+use info_derive::Info;
 use std::io::{self, Write};
 
 use rust_decimal::Decimal;
+
+pub trait Info {
+    fn info(&self);
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct PriceLevel {
@@ -22,7 +27,7 @@ pub(crate) struct OrderBookUpdate {
 // - Verify update.prevTs == self.timestamp
 // - Apply insert/update/delete rules
 // - Advance timestamp
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Info)]
 pub(crate) struct OrderBook {
     timestamp: u64,
     symbol: String,
@@ -131,6 +136,7 @@ impl OrderBook {
                 .get(index)
                 .map(|bid| (bid.quantity.to_string(), bid.price.to_string()))
                 .unwrap_or_else(|| ("-".to_string(), "-".to_string()));
+
             let (ask_price, ask_quantity) = self
                 .asks
                 .get(index)

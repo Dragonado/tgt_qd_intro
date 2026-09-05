@@ -3,10 +3,10 @@ use std::time::Instant;
 mod listener;
 mod order_book;
 
+use crate::order_book::{Info, OrderBook};
 use std::io::{self, Write};
 
 use crate::listener::WooListener;
-use crate::order_book::OrderBook;
 
 struct TerminalGuard;
 
@@ -38,7 +38,7 @@ fn main() {
         .subscribe("orderbookupdaterpi@PERP_ETH_USDT@50")
         .unwrap();
 
-    order_book.print_state();
+    order_book.info();
 
     let mut started;
     loop {
