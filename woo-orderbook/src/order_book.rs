@@ -1,6 +1,7 @@
 use std::io::{self, Write};
+use std::io::{Error, ErrorKind};
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default)]
 pub(crate) struct PriceLevel {
     pub(crate) price: String,
     pub(crate) quantity: String,
@@ -20,7 +21,7 @@ pub(crate) struct OrderBookUpdate {
 // - Verify update.prevTs == self.timestamp
 // - Apply insert/update/delete rules
 // - Advance timestamp
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct OrderBook {
     timestamp: u64,
     symbol: String,
@@ -40,18 +41,37 @@ impl OrderBook {
         }
     }
 
+    pub(crate) fn from_snapshot(
+        symbol: &str,
+        max_levels: usize,
+        timestamp: u64,
+        asks: Vec<PriceLevel>,
+        bids: Vec<PriceLevel>,
+    ) -> Self {
+        // asks.sort();
+        // bids.sort();
+        Self {
+            timestamp,
+            symbol: symbol.to_string(),
+            max_levels,
+            asks,
+            bids,
+        }
+    }
+
     // If order_book.previous_timestamp == order_book.timestamp then we incrementally update the order book.
-    // If order_book.previous_timestamp != order_book.timestamp then we missed an update somewhere.
-    // In this case, we discard all data order_book and only keep the incremental update.
+    // Else we throw an error.
+    // In the second case, we must have missed an update in between and hence need to recover from a snapshot.
     pub(crate) fn ingest_incremental_update(
         &mut self,
         update: OrderBookUpdate,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Validate and apply update.
-        self.asks = update.asks;
-        self.bids = update.bids;
-        self.timestamp = update.timestamp;
-        Ok(())
+        // // Validate and apply update.
+        // self.asks = update.asks;
+        // self.bids = update.bids;
+        // self.timestamp = update.timestamp;
+
+        Err("Not taking updates rn".into())
     }
 
     pub(crate) fn print_state(&self) {
