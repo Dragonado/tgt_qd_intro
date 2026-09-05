@@ -40,6 +40,18 @@ fn main() {
 
     order_book.info();
 
+    println!("Start ingesting PERP_ETH_USDT data? (y/n): ");
+
+    let mut input = String::new();
+
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read line");
+
+    if input.trim() != "y" {
+        return;
+    }
+
     let mut started;
     loop {
         started = Instant::now();

@@ -36,7 +36,6 @@ impl WooListener {
                     return Err("Subscription unsuccessful.".into());
                 }
 
-                println!("{}", serde_json::to_string_pretty(&response)?);
                 Ok(())
             }
             _ => Err("Subscription unsuccessful.".into()),

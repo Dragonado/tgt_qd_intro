@@ -7,13 +7,13 @@ pub trait Info {
     fn info(&self);
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Info)]
 pub(crate) struct PriceLevel {
     pub(crate) price: Decimal,
     pub(crate) quantity: Decimal,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Info)]
 pub(crate) struct OrderBookUpdate {
     pub(crate) symbol: String,
     pub(crate) previous_timestamp: u64,
