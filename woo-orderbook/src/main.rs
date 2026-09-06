@@ -1,5 +1,4 @@
-use std::sync::mpsc::sync_channel;
-use std::{sync::mpsc, time::Instant};
+use std::{sync::mpsc::sync_channel, time::Instant};
 
 mod listener;
 
@@ -34,9 +33,10 @@ fn main() {
     let _terminal_guard = TerminalGuard::enter();
 
     let mut order_book = OrderBook::new("PERP_ETH_USDT".to_string(), 50);
-    println!("Order book structure: {:#?}", order_book.info());
+    println!("Order book structure:");
+    order_book.info();
 
-    println!("Start ingesting PERP_ETH_USDT data? (y/n): ");
+    println!("\nStart ingesting PERP_ETH_USDT data? (y/n): ");
     let mut input = String::new();
 
     io::stdin()
@@ -47,7 +47,10 @@ fn main() {
         return;
     }
 
-    // Synchronous channel because we only have 1 producer in the MPSC queue.
+    // Get inital snapshot.
+    order_book = WooListener::wait_and_get_snapshot("PERP_ETH_USDT", 50).unwrap();
+
+    // Using synchronous channel because we only have 1 producer in the MPSC queue.
     let (tx, rx) = sync_channel::<OrderBookUpdate>(1024);
 
     thread::spawn(move || {
@@ -76,15 +79,14 @@ fn main() {
                 }
             },
             Err(err) => {
-                order_book = WooListener::wait_and_get_snapshot("PERP_ETH_USDT", 50).unwrap();
-                status = format!("Subscription connection failed, fetching from snapshot: {err}");
+                println!("Subscription connection failed! Try again. Err = {err}");
+                return;
             }
         }
 
         order_book.print_state();
         println!();
         println!("Status: {status}");
-        println!("Update RTT: {:?}", started.elapsed());
-        println!("Buffered updates remaining: {}", 0);
+        println!("Update wait time: {:?}", started.elapsed());
     }
 }
