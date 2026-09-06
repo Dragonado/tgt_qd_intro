@@ -1,5 +1,12 @@
 # WOO X Order Book Visualizer
 
+## How to run
+
+```zsh
+cd woo-orderbook
+cargo run
+```
+
 ## Demo
 
 ![Live ETH-USDT perpetual order book](assets/part1.gif)
@@ -45,7 +52,7 @@ The logic is below:
 ```
 while socket is active && we get an update:
 
-- If update timestamp == order book timestamp, update orderbook with the new update.
+- If update.previous_timestamp == order book timestamp, update orderbook with the new update and update timestamp.
 - Else, missed an update in between. There is no way to recover so we read from a fresh snapshot.
 ```
 Pros:
@@ -78,7 +85,7 @@ Pros:
 - Fast and robust.
 - Latency is still ~50ms.
 - std library only provides MPSC queue (would have used SPSC queue otherwise).
-- We can use a sync queue because we only have one producer. We don't need asynchronous producers.
+- Altough API supports multiple producers, for simplicity I chose a single one with bounded buffer that puts back pressure. 
 
 Cons:
 

@@ -11,8 +11,8 @@ pub(crate) struct WooListener {
 }
 
 impl WooListener {
-    // Initializes a webssocket.
-    // Note: This is a sync function that performs a network call.
+    /// Initializes a WebSocket connection to WOO X.
+    /// Note: This is a sync function that performs a network call.
     pub(crate) fn connect() -> Result<Self, Box<dyn std::error::Error>> {
         let uri: Uri = "wss://wss.woox.io/v3/public".parse().unwrap();
         let builder = ClientRequestBuilder::new(uri);
@@ -21,9 +21,9 @@ impl WooListener {
         Ok(WooListener { socket })
     }
 
-    // Subscribes to a feed for the given command.
-    // Although not asserted yet, we expect an orderbookupdaterpi@ command or else other functions will fail.
-    // Note: This is a sync function that performs a network call.
+    /// Subscribes to a feed for the given command.
+    /// Although not asserted yet, we expect an orderbookupdaterpi@ command or else other functions will fail.
+    /// Note: This is a sync function that performs a network call.
     pub(crate) fn subscribe(&mut self, topic: &str) -> Result<(), Box<dyn std::error::Error>> {
         let command = serde_json::json!({
             "cmd": "SUBSCRIBE",
@@ -47,8 +47,8 @@ impl WooListener {
         }
     }
 
-    // An associated function that fetches a snapshot of the orderbook.
-    // Note: This is a sync function that performs a network call.
+    /// An associated function that fetches a snapshot of the orderbook.
+    /// Note: This is a sync function that performs a network call.
     pub(crate) fn wait_and_get_snapshot(
         symbol: &str,
         max_levels: usize,
@@ -81,8 +81,8 @@ impl WooListener {
         ))
     }
 
-    // Fetches an orderbook update for the given symbol and depth.
-    // Note: This is a sync function that performs a network call.
+    /// Fetches an orderbook update for the given symbol and depth.
+    /// Note: This is a sync function that performs a network call.
     pub(crate) fn wait_and_get_update(
         &mut self,
     ) -> Result<OrderBookUpdate, Box<dyn std::error::Error>> {

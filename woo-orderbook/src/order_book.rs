@@ -32,8 +32,8 @@ pub(crate) struct OrderBook {
 }
 
 impl OrderBook {
-    // Construct an empty orderbook with the desired symbol and max_size.
-    // Although not asserted, we expect a max_size of >= 50 or else orderbook might be holding wrong data.
+    /// Construct an empty orderbook with the desired symbol and max_size.
+    /// Although not asserted, we expect a max_size of >= 50 or else orderbook might be holding wrong data.
     pub(crate) fn new(symbol: String, max_levels: usize) -> Self {
         Self {
             timestamp: 0,
@@ -44,7 +44,7 @@ impl OrderBook {
         }
     }
 
-    // Construct an orderbook from snapshot of another orderbook.
+    /// Construct an orderbook from snapshot of another orderbook.
     pub(crate) fn from_snapshot(
         symbol: String,
         max_levels: usize,
@@ -64,9 +64,9 @@ impl OrderBook {
         }
     }
 
-    // If order_book.previous_timestamp <= order_book.timestamp then we incrementally update (or skip the update) the order book.
-    // Else, we throw an error.
-    // In the second case, we must have missed an update in between and hence need to recover from a snapshot.
+    /// If order_book.previous_timestamp <= order_book.timestamp then we incrementally update (or skip the update) the order book.
+    /// Else, we throw an error.
+    /// In the second case, we must have missed an update in between and hence need to recover from a snapshot.
     pub(crate) fn ingest_incremental_update(
         &mut self,
         update: OrderBookUpdate,
@@ -90,7 +90,7 @@ impl OrderBook {
         Ok("Update successful".into())
     }
 
-    // Prints the best 5 bids/asks of the orderbook.
+    /// Prints the best 5 bids/asks of the orderbook.
     pub(crate) fn print_state(&self) {
         print!("\x1B[H\x1B[J");
 
