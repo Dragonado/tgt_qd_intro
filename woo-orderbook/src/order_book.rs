@@ -105,12 +105,16 @@ impl OrderBook {
     pub(crate) fn ingest_incremental_update(
         &mut self,
         update: OrderBookUpdate,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<String, Box<dyn std::error::Error>> {
         if update.symbol != self.symbol {
             return Err("Wrong symbol update".into());
         }
+        if update.timestamp <= self.timestamp {
+            return Ok("Skipping update because it's old".into());
+        }
+
         if update.previous_timestamp != self.timestamp {
-            return Err("Timestamp mismatch error".into());
+            return Err("Missed an update in between".into());
         }
 
         self.timestamp = update.timestamp;
@@ -118,7 +122,7 @@ impl OrderBook {
         Self::upsert_filter_and_sort(&mut self.asks, update.asks, self.max_levels, false);
         Self::upsert_filter_and_sort(&mut self.bids, update.bids, self.max_levels, true);
 
-        Ok(())
+        Ok("Update successful".into())
     }
 
     pub(crate) fn print_state(&self) {
