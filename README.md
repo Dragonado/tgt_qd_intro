@@ -41,7 +41,7 @@ Pros:
 Cons:
 
 - Slower.
-- Latency of ~193ms which is more than the subscription latency.
+- Latency of ~200ms which is more than the subscription latency.
 
 ### 2. Read initially from snapshot and immediately update from subscription without buffering
 
